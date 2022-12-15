@@ -5,13 +5,14 @@
 
 #define BLOCK_SIZE 512
 #define BLOCK_NUM 4096
+#define INODE_NUM 4096
 #define INODE_SIZE 32
 #define INODES_BMAP_BLOCK_ID 1
 #define BLOCKS_BMAP_BLOCK_ID 2
 #define INODES_BLOCK_ID 3
 #define INODE_DIR_LINK_NUM 9
 #define INODE_IND_LINK_NUM 1
-#define FILE_NAME_MAX_LEN 30
+#define FILE_NAME_MAX_LEN 16
 #define DELIM '|'
 #define DISK_PATH "./disk.bin" // "./../disk/disk.bin"
 
@@ -218,28 +219,60 @@ INode* getINodeFromStr(unsigned char *s) {
     node->indirect_links = (int) s[15];
     // name
     memcpy(node->name, s + 16, 15);
-    node->name[31] = '\0';
+    node->name[15] = '\0';
     return node;
 }
 
-int search_inode_id(char * file_path, int name_length) {
+INode* find_free_inode() {
     // read in the inode bitmap
     block_read(buffer_0, INODES_BMAP_BLOCK_ID);
     // go through bitmap
-    for (int i = 0; i < 4096; ++i) {
+    for (int i = 0; i < INODE_NUM; ++i) {
+        // if inode is not occupied
+        if (get_bit_read(buffer_0, i) != 0) {
+            // get the inode
+            inode_read(inode_buff, i);
+            INode* tmp = getINodeFromStr(inode_buff);
+            tmp->index = i;
+            memcpy(inode_buff, getStrOfInode(tmp), INODE_SIZE);
+            inode_write(inode_buff, i);
+            return tmp;
+        }
+    }
+    // not found
+    return NULL;
+}
+
+int search_inode_id(char * file_path) {
+    // init config
+    if (strlen(file_path) >= FILE_NAME_MAX_LEN) {
+        file_path[FILE_NAME_MAX_LEN - 1] = '\0';
+    }
+    // read in the inode bitmap
+    block_read(buffer_0, INODES_BMAP_BLOCK_ID);
+    // go through bitmap
+    for (int i = 0; i < INODE_NUM; ++i) {
         // if inode is occupied
         if (get_bit_read(buffer_0, i) == 0) {
             // get the inode
-            inode_read(inode_buff, 11);
+            inode_read(inode_buff, i);
             INode* tmp = getINodeFromStr(inode_buff);
             // compare file name
-            if (memcmp(tmp->name, file_path, name_length) == 0) {
+            if (strcmp(tmp->name, file_path) == 0) {
                 return tmp->index;
             }
         }
     }
     // not found
     return -1;
+}
+
+void free_inode(int inode_id) {
+    
+}
+
+void free_block(int block_id) {
+
 }
 
 void myRead() {
@@ -251,7 +284,7 @@ void myWrite() {
 }
 
 void setTest() {
-    if (access(DISK_PATH, F_OK) == 0) {
+    if (access(DISK_PATH, F_OK) != 0) {
         // file doesn't exist
         create_zeroes();
     }
@@ -275,6 +308,12 @@ void setTest() {
     i->bytes = 7219;
     memcpy(inode_buff, getStrOfInode(i), INODE_SIZE);
     inode_write(inode_buff, 7);
+    // linear search
+    block_read(buffer_0, INODES_BMAP_BLOCK_ID);
+    set_bit_write(buffer_0, 11, 0);
+    block_write(buffer_0, INODES_BMAP_BLOCK_ID);
+    int index = search_inode_id("/yopou.txt\0");
+    printf("The inode id is : %d\n", index);
     // close file
     fclose(ptr);
 }
@@ -290,16 +329,16 @@ int main(int argc, char const *argv[])
     m.direct_links[0] = 15;
     m.direct_links[1] = 31;
     m.indirect_links = 23;
-    memcpy(m.name, "/yopou.txt\0", 8);
+    memcpy(m.name, "/yopou.txt\0", 11);
 
     memcpy(inode_buff, getStrOfInode(&m), INODE_SIZE);
 
     for (int i = 0; i < INODE_SIZE; ++i) {
-        //printf("%d ", (int) inode_buff[i]);
+        printf("%d ", (int) inode_buff[i]);
     }
-    //printf("\n%s\n", inode_buff + 16);
+    printf("\n%s\n", inode_buff + 16);
 
-    // setTest();
+    setTest();
 
     return 0;
 }
