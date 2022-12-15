@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <string.h>
 
+#define OCCP 0x00
+#define FREE 0x01
 #define BLOCK_SIZE 512
 #define BLOCK_NUM 4096
 #define INODE_NUM 4096
@@ -148,7 +150,7 @@ void initYLLFS() {
     block_write(buffer_1, INODES_BMAP_BLOCK_ID);
     // Block 2 - data bitmap
     buff_fills(buffer_1, 0xff);
-    fill_bit_write(buffer_1, 0, 9, 0x0); // first 10 blocks not usable
+    fill_bit_write(buffer_1, 0, 9, OCCP); // first 10 blocks not usable
     block_write(buffer_1, BLOCKS_BMAP_BLOCK_ID);
 }
 
@@ -229,10 +231,11 @@ INode* find_free_inode() {
     // go through bitmap
     for (int i = 0; i < INODE_NUM; ++i) {
         // if inode is not occupied
-        if (get_bit_read(buffer_0, i) != 0) {
+        if (get_bit_read(buffer_0, i) != OCCP) {
             // get the inode
             inode_read(inode_buff, i);
             INode* tmp = getINodeFromStr(inode_buff);
+            // set id
             tmp->index = i;
             memcpy(inode_buff, getStrOfInode(tmp), INODE_SIZE);
             inode_write(inode_buff, i);
@@ -253,7 +256,7 @@ int search_inode_id(char * file_path) {
     // go through bitmap
     for (int i = 0; i < INODE_NUM; ++i) {
         // if inode is occupied
-        if (get_bit_read(buffer_0, i) == 0) {
+        if (get_bit_read(buffer_0, i) == OCCP) {
             // get the inode
             inode_read(inode_buff, i);
             INode* tmp = getINodeFromStr(inode_buff);
@@ -268,19 +271,36 @@ int search_inode_id(char * file_path) {
 }
 
 void free_inode(int inode_id) {
+    // read into the bitmap
+    block_read(buffer_2, INODES_BMAP_BLOCK_ID);
+    // set inode bitmap as 1
+    set_bit_write(buffer_2, inode_id, FREE);
+    // write the bitmap
+    block_write(buffer_2, INODES_BMAP_BLOCK_ID);
+}
+
+void free_blocks(INode *n) {
+    // read into the bitmap
+    block_read(buffer_1, BLOCKS_BMAP_BLOCK_ID);
+    // set block bitmap as 1
+    for (int i = 0; i < n->blocks; ++i) {
+        int tmp = n->direct_links[i];
+        set_bit_write(buffer_1, tmp, FREE);
+    }
+    // write the bitmap
+    block_write(buffer_1, BLOCKS_BMAP_BLOCK_ID);
+}
+
+void myRead(char* file_path, char** content) {
+
+}
+
+void myWrite(char* file_path, char* content) {
+    int content_len = strlen(content);
+    if (content_len < 1) {
+        return;
+    }
     
-}
-
-void free_block(int block_id) {
-
-}
-
-void myRead() {
-
-}
-
-void myWrite() {
-
 }
 
 void setTest() {
