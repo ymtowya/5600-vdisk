@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 
 #define OCCP 0x00
 #define FREE 0x01
@@ -295,12 +296,27 @@ void myRead(char* file_path, char** content) {
 
 }
 
-void myWrite(char* file_path, char* content) {
-    int content_len = strlen(content);
+INode* myWrite(char* file_path, char* content) {
+    int content_len = strlen(content) + 1;
     if (content_len < 1) {
         return;
     }
-    
+    int blocks_needed = (int) ceil(content_len / BLOCK_SIZE);
+    blocks_needed = (blocks_needed > INODE_DIR_LINK_NUM) ?
+                    INODE_DIR_LINK_NUM : blocks_needed;
+    INode* n = (INode *) malloc(sizeof(INode));
+    n->blocks = blocks_needed;
+    int inode_id = search_inode_id(file_path);
+    if (inode_id != -1) {
+        // TODO: release the whole inode
+    }
+    inode_id = find_free_inode();
+    if (inode_id == -1) {
+        // TODO: no more free inodes
+    }
+    n->index = inode_id;
+    n->bytes = content_len;
+
 }
 
 void setTest() {
