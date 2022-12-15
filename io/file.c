@@ -296,7 +296,7 @@ void myRead(char* file_path, char** content) {
 
 }
 
-INode* myWrite(char* file_path, char* content) {
+INode* inode_config(char* file_path, char* content) {
     int content_len = strlen(content) + 1;
     if (content_len < 1) {
         return;
@@ -313,11 +313,23 @@ INode* myWrite(char* file_path, char* content) {
     inode_id = find_free_inode();
     if (inode_id == -1) {
         // TODO: no more free inodes
+        return NULL;
     }
     n->index = inode_id;
     n->bytes = content_len;
-
+    n->hard_link_num = 1;
+    n->type = 'f';
+    memcpy(n->name, file_path, FILE_NAME_MAX_LEN);
+    for (int i = 0; i < blocks_needed; ++i) {
+        // TODO apply for empty block and occupy them
+    }
+    for (int i = 0; i < blocks_needed; ++i) {
+        // occupy blocks
+    }
+    return n;
 }
+
+
 
 void setTest() {
     if (access(DISK_PATH, F_OK) != 0) {
