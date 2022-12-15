@@ -1,12 +1,19 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
 #define BLOCK_SIZE 512
 #define BLOCK_NUM 4096
 #define INODE_SIZE 32
 #define INODES_BMAP_BLOCK_ID 1
 #define BLOCKS_BMAP_BLOCK_ID 2
-#define DISK_PATH "./../disk/disk.bin"
+#define INODES_BLOCK_ID 3
+#define INODE_DIR_LINK_NUM 9
+#define INODE_IND_LINK_NUM 1
+#define FILE_NAME_MAX_LEN 30
+#define DELIM '|'
+#define DISK_PATH "./disk.bin" // "./../disk/disk.bin"
 
 unsigned char inode_buff[INODE_SIZE];
 unsigned char buffer_0[BLOCK_SIZE];
@@ -15,6 +22,21 @@ unsigned char buffer_2[BLOCK_SIZE];
 unsigned char buffer_3[BLOCK_SIZE];
 unsigned char* buffers[4] = {buffer_0, buffer_1, buffer_2, buffer_3};
 FILE *ptr;
+
+// |
+typedef struct INode
+{
+    /* data */
+    char type;
+    int index;
+    int blocks;
+    int hard_link_num;
+    int bytes;
+    int direct_links[INODE_DIR_LINK_NUM];
+    int indirect_links;
+    char name[FILE_NAME_MAX_LEN];
+} INode;
+
 
 int create_zeroes() {
     ptr = fopen(DISK_PATH, "wb");
@@ -82,6 +104,13 @@ void fill_int_read(unsigned char *buff, int start, int end, long* value) {
     }
 }
 
+int get_bit_read(unsigned char *buff, int pos) {
+    int i = pos / 8;
+    int r = 7 - pos % 8;
+    unsigned char tmp = buff[i];
+    return (int) 0x01 & (tmp >> r);
+}
+
 void set_bit_write(unsigned char *buff, int pos, unsigned char value) {
     unsigned char tmp = value & 0x01;
     int i = pos / 8;
@@ -124,12 +153,93 @@ void initYLLFS() {
 
 int inode_write(unsigned char *buff, int inode_id) {
     // 512 / 32 = 16 inodes in one block
-    int block_id = inode_id / 16 + INODES_BMAP_BLOCK_ID;
+    int block_id = inode_id / 16 + INODES_BLOCK_ID;
     int offset = INODE_SIZE * (inode_id % 16);
     rewind(ptr);
     fseek(ptr, block_id * BLOCK_SIZE + offset, SEEK_SET);
     int re = fwrite(buff, 1, INODE_SIZE, ptr);
     return re;
+}
+
+int inode_read(unsigned char *buff, int inode_id) {
+    // 512 / 32 = 16 inodes in one block
+    int block_id = inode_id / 16 + INODES_BLOCK_ID;
+    int offset = INODE_SIZE * (inode_id % 16);
+    rewind(ptr);
+    fseek(ptr, block_id * BLOCK_SIZE + offset, SEEK_SET);
+    int re = fread(buff, 1, INODE_SIZE, ptr);
+    return re;
+}
+
+unsigned char* getStrOfInode(INode* n) {
+    unsigned char* res = (unsigned char *) malloc(INODE_SIZE);
+    // type
+    res[0] = n->type;
+    //index
+    res[1] = n->index;
+    // blocks
+    res[2] = n->blocks;
+    // hard links
+    res[3] = n->hard_link_num;
+    // bytes
+    fill_int_write(res, 4, 5, (long) n->bytes);
+    // direct links
+    for (int i = 0; i < n->blocks; ++i) {
+        res[6 + i] = n->direct_links[i];
+    }
+    // indirect
+    res[15] = n->indirect_links;
+    // name
+    memcpy(res + 16, n->name, 15);
+    res[31] = '\0';
+    // finish
+    return res;
+}
+
+INode* getINodeFromStr(unsigned char *s) {
+    INode * node = (INode *) malloc(sizeof(INode));
+    // type
+    node->type = s[0];
+    // index
+    node->index = (int) s[1];
+    // blocks
+    node->blocks = (int) s[2];
+    // hard links
+    node->hard_link_num = (int) s[3];
+    // bytes
+    long tmp = 0L;
+    fill_int_read(s, 4, 5, &tmp);
+    node->bytes = (int) tmp;
+    // direct
+    for (int i = 0; i < node->blocks; ++i) {
+        node->direct_links[i] = (int) s[6 + i];
+    }
+    // indirect
+    node->indirect_links = (int) s[15];
+    // name
+    memcpy(node->name, s + 16, 15);
+    node->name[31] = '\0';
+    return node;
+}
+
+int search_inode_id(char * file_path, int name_length) {
+    // read in the inode bitmap
+    block_read(buffer_0, INODES_BMAP_BLOCK_ID);
+    // go through bitmap
+    for (int i = 0; i < 4096; ++i) {
+        // if inode is occupied
+        if (get_bit_read(buffer_0, i) == 0) {
+            // get the inode
+            inode_read(inode_buff, 11);
+            INode* tmp = getINodeFromStr(inode_buff);
+            // compare file name
+            if (memcmp(tmp->name, file_path, name_length) == 0) {
+                return tmp->index;
+            }
+        }
+    }
+    // not found
+    return -1;
 }
 
 void myRead() {
@@ -140,8 +250,7 @@ void myWrite() {
 
 }
 
-int main(int argc, char const *argv[])
-{
+void setTest() {
     if (access(DISK_PATH, F_OK) == 0) {
         // file doesn't exist
         create_zeroes();
@@ -157,9 +266,52 @@ int main(int argc, char const *argv[])
     block_write(buffer_0, 16);
     block_read(buffer_1, 16);
     for (int i = 0; i < BLOCK_SIZE; ++i) {
-        printf("%x ", buffer_1[i]);
+        // printf("%x ", buffer_1[i]);
     }
+    // test write inode
+
+    inode_read(inode_buff, 11);
+    INode* i = getINodeFromStr(inode_buff);
+    i->bytes = 7219;
+    memcpy(inode_buff, getStrOfInode(i), INODE_SIZE);
+    inode_write(inode_buff, 7);
     // close file
     fclose(ptr);
+}
+
+int main(int argc, char const *argv[])
+{
+    INode m;
+    m.type = 'f';
+    m.index = 1;
+    m.blocks = 2;
+    m.hard_link_num = 1;;
+    m.bytes = 3724;
+    m.direct_links[0] = 15;
+    m.direct_links[1] = 31;
+    m.indirect_links = 23;
+    memcpy(m.name, "/yopou.txt\0", 8);
+
+    memcpy(inode_buff, getStrOfInode(&m), INODE_SIZE);
+
+    for (int i = 0; i < INODE_SIZE; ++i) {
+        //printf("%d ", (int) inode_buff[i]);
+    }
+    //printf("\n%s\n", inode_buff + 16);
+
+    // setTest();
+
     return 0;
+}
+
+void testBitRead() {
+    unsigned char bu[4];
+    bu[0] = 0x2B;
+    bu[1] = 0x2B;
+    printf("%d\n", get_bit_read(bu, 2));
+    printf("%d\n", get_bit_read(bu, 5));
+    printf("%d\n", get_bit_read(bu, 12));
+    printf("%d\n", get_bit_read(bu, 13));
+    printf("%d\n", get_bit_read(bu, 15));
+
 }
