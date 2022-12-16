@@ -16,6 +16,7 @@
 #define INODE_DIR_LINK_NUM 9
 #define INODE_IND_LINK_NUM 1
 #define FILE_NAME_MAX_LEN 16
+#define CONTENT_MAX_LEN 512 * 9 + 1
 #define DELIM '|'
 #define DISK_PATH "./disk.bin" // "./../disk/disk.bin"
 
@@ -25,6 +26,7 @@ unsigned char buffer_1[BLOCK_SIZE];
 unsigned char buffer_2[BLOCK_SIZE];
 unsigned char buffer_3[BLOCK_SIZE];
 unsigned char* buffers[4] = {buffer_0, buffer_1, buffer_2, buffer_3};
+char buffer_content[CONTENT_MAX_LEN];
 FILE *ptr;
 
 // |
@@ -247,6 +249,25 @@ INode* find_free_inode() {
     return NULL;
 }
 
+int find_free_blocks(int* links, int num) {
+    // read in the block bitmap
+    block_read(buffer_0, BLOCKS_BMAP_BLOCK_ID);
+    // find blocks
+    int curr = 0;
+    for (int i = 0; i < BLOCK_NUM; ++i) {
+        if (get_bit_read(buffer_0, i) == FREE) {
+            links[curr] = i;
+            ++curr;
+            if (curr == num) {
+                return 1;
+            }
+        }
+    }
+    if (curr < num) // not enough blocks
+        return 0;
+    return 1;
+}
+
 INode* search_inode_by_path(char * file_path) {
     // init config
     if (strlen(file_path) >= FILE_NAME_MAX_LEN) {
@@ -293,6 +314,7 @@ void free_blocks(INode *n) {
 }
 
 void myRead(char* file_path, char** content) {
+    INode* node = search_inode_by_path(file_path);
 
 }
 
@@ -308,12 +330,13 @@ INode* inode_config(char* file_path, char* content) {
     n->blocks = blocks_needed;
     INode* node = search_inode_by_path(file_path);
     if (node != NULL) {
-        // TODO: release the whole inode
+        // release the whole inode
         inode_release(node);
     }
     int inode_id = find_free_inode();
     if (inode_id == -1) {
-        // TODO: no more free inodes
+        // no more free inodes
+        printf("ERROR: No more free inodes.\n");
         return NULL;
     }
     n->index = inode_id;
@@ -321,11 +344,10 @@ INode* inode_config(char* file_path, char* content) {
     n->hard_link_num = 1;
     n->type = 'f';
     memcpy(n->name, file_path, FILE_NAME_MAX_LEN);
-    for (int i = 0; i < blocks_needed; ++i) {
-        // TODO apply for empty block and occupy them
-    }
-    for (int i = 0; i < blocks_needed; ++i) {
-        // occupy blocks
+    int re = find_free_blocks(n->direct_links, blocks_needed);
+    if (re == 0) {
+        printf("ERROR: No enough free blocks.\n");
+        return NULL;
     }
     return n;
 }
@@ -336,27 +358,26 @@ int myWrite(char* file_path, char* content) {
         // not enough inode / blocks
         return -1;
     }
+    // occupy blocks - buffer 2
+    block_read(buffer_2, BLOCKS_BMAP_BLOCK_ID);
     int content_len = node->bytes;
     for (int i = 0; i < node->blocks; ++i) {
         int block_id = node->direct_links[i];
+        // buffer 3
         memcpy(buffer_3, content[i * BLOCK_SIZE], BLOCK_SIZE);
         block_write(buffer_3, block_id);
+        // buffer 2
+        set_bit_write(buffer_2, block_id, OCCP);
     }
+    block_write(buffer_2, BLOCKS_BMAP_BLOCK_ID);
     return 1;
 }
 
 void inode_release(INode* node) {
-    // inode bitmap
-    block_read(buffer_0, INODES_BMAP_BLOCK_ID);
-    set_bit_write(buffer_0, node->index, FREE);
-    block_write(buffer_0, INODES_BMAP_BLOCK_ID);
     // block bitmap
-    block_read(buffer_0, BLOCKS_BMAP_BLOCK_ID);
-    for (int i = 0; i < node->blocks; ++i) {
-        int block_id = node->direct_links[i];
-        set_bit_write(buffer_0, block_id, FREE);
-    }
-    block_write(buffer_0, BLOCKS_BMAP_BLOCK_ID);
+    free_blocks(node);
+    // inode bitmap
+    free_inode(node->index);
     // free
     free(node);
 }
