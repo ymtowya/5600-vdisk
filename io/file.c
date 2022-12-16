@@ -447,21 +447,27 @@ void setTest() {
     printf("The inode id is : %d\n", n->index);
 }
 
+void fillTestChars(char* testChars, char v) {
+    for (int i = 0; i < 1499; ++i) {
+        testChars[i] = v;
+    }
+    testChars[1499] = '\0';
+}
+
 int main(int argc, char const *argv[])
 {
     char testChars[1500];
-    for (int i = 0; i < 1499; ++i) {
-        testChars[i] = 'a' + (i % 26);
-    }
-    testChars[1499] = '\0';
     
     init();
     myWrite("/p1.txt\0", "BUT YOU SIAD SO!!!\n");
     myWrite("/p2.txt\0", "Hello Worlds\0");
+    fillTestChars(testChars, 'A');
     myWrite("/p3.txt\0", testChars);
-    myDelete("/p2.txt\0");
-    myWrite("/p4.txt\0", testChars);
-    myRead("/p3.txt\0", buffer_content);
+    fillTestChars(testChars, 'B');
+    myWrite("/p2.txt\0", testChars);
+    fillTestChars(testChars, 'C');
+    myWrite("/p1.txt\0", testChars);
+    myRead("/p1.txt\0", buffer_content);
     printf("%s\n", buffer_content);
     end();
 
