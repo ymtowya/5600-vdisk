@@ -18,7 +18,7 @@
 #define FILE_NAME_MAX_LEN 16
 #define CONTENT_MAX_LEN 512 * 9 + 1
 #define DELIM '|'
-#define DISK_PATH "./disk.bin" // "./../disk/disk.bin"
+#define DISK_PATH "./../disk/disk.bin"
 
 
 unsigned char inode_buff[INODE_SIZE];
