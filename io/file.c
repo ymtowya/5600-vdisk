@@ -122,7 +122,7 @@ void set_bit_write(unsigned char *buff, int pos, unsigned char value) {
     int i = pos / 8;
     int r = 7 - pos % 8;
     
-    if (tmp == 0L) {
+    if (tmp == 0) {
         // 0 - &
         tmp = 0x0 | (0x1 << r);
         tmp = ~tmp & 0xff;
@@ -341,7 +341,7 @@ INode* inode_config(char* file_path, char* content) {
     if (content_len < 1) {
         return NULL;
     }
-    int blocks_needed = (int) ceil(content_len / BLOCK_SIZE);
+    int blocks_needed = (int) ceil(1.00 * content_len / BLOCK_SIZE);
     blocks_needed = (blocks_needed > INODE_DIR_LINK_NUM) ?
                     INODE_DIR_LINK_NUM : blocks_needed;
     INode* node = search_inode_by_path(file_path);
@@ -350,6 +350,7 @@ INode* inode_config(char* file_path, char* content) {
         inode_release(node);
     }
     INode* n = find_free_inode();
+    printf("INDEX: %d\n", n->index);
     if (n == NULL) {
         // no more free inodes
         printf("ERROR: No more free inodes.\n");
@@ -372,12 +373,20 @@ int myWrite(char* file_path, char* content) {
     INode* node = inode_config(file_path, content);
     if (node == NULL) {
         // not enough inode / blocks
+        printf("Something wrong.\n");
         return -1;
     }
+    block_read(buffer_0, INODES_BMAP_BLOCK_ID);
+    set_bit_write(buffer_0, node->index, OCCP);
+    block_write(buffer_0, INODES_BMAP_BLOCK_ID);
+    // write the inode
+    memcpy(inode_buff, getStrOfInode(node), INODE_SIZE);
+    inode_write(inode_buff, node->index);
     // occupy blocks - buffer 2
     block_read(buffer_2, BLOCKS_BMAP_BLOCK_ID);
     for (int i = 0; i < node->blocks; ++i) {
         int block_id = node->direct_links[i];
+        printf("LINK: %d\n", block_id);
         // buffer 3
         memcpy(buffer_3, content + i * BLOCK_SIZE, BLOCK_SIZE);
         block_write(buffer_3, block_id);
@@ -385,6 +394,16 @@ int myWrite(char* file_path, char* content) {
         set_bit_write(buffer_2, block_id, OCCP);
     }
     block_write(buffer_2, BLOCKS_BMAP_BLOCK_ID);
+    return 1;
+}
+
+int myDelete(char* file_path) {
+    INode* node = search_inode_by_path(file_path);
+    if (node == NULL) {
+        printf("WARN: No such file exists!\n");
+        return -1;
+    }
+    inode_release(node);
     return 1;
 }
 
@@ -430,10 +449,19 @@ void setTest() {
 
 int main(int argc, char const *argv[])
 {
+    char testChars[1500];
+    for (int i = 0; i < 1499; ++i) {
+        testChars[i] = 'a' + (i % 26);
+    }
+    testChars[1499] = '\0';
     
     init();
-    myWrite("/p1.txt\0", "Hello from the world!\0");
-    myRead("/p1.txt\0", buffer_content);
+    myWrite("/p1.txt\0", "BUT YOU SIAD SO!!!\n");
+    myWrite("/p2.txt\0", "Hello Worlds\0");
+    myWrite("/p3.txt\0", testChars);
+    myDelete("/p2.txt\0");
+    myWrite("/p4.txt\0", testChars);
+    myRead("/p3.txt\0", buffer_content);
     printf("%s\n", buffer_content);
     end();
 
