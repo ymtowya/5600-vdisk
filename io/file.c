@@ -313,9 +313,27 @@ void free_blocks(INode *n) {
     block_write(buffer_1, BLOCKS_BMAP_BLOCK_ID);
 }
 
-void myRead(char* file_path, char** content) {
+int myRead(char* file_path, char* content) {
     INode* node = search_inode_by_path(file_path);
+    if (node == NULL) {
+        printf("WARNING: Not found!\n");
+        return -1;
+    }
+    for (int i = 0; i < node->blocks; ++i) {
+        int block_id = node->direct_links[i];
+        block_read(buffer_3, block_id);
+        memcpy(content + i * BLOCK_SIZE, buffer_3, BLOCK_SIZE);
+    }
+    return 1;
+}
 
+void inode_release(INode* node) {
+    // block bitmap
+    free_blocks(node);
+    // inode bitmap
+    free_inode(node->index);
+    // free
+    free(node);
 }
 
 INode* inode_config(char* file_path, char* content) {
@@ -326,20 +344,18 @@ INode* inode_config(char* file_path, char* content) {
     int blocks_needed = (int) ceil(content_len / BLOCK_SIZE);
     blocks_needed = (blocks_needed > INODE_DIR_LINK_NUM) ?
                     INODE_DIR_LINK_NUM : blocks_needed;
-    INode* n = (INode *) malloc(sizeof(INode));
-    n->blocks = blocks_needed;
     INode* node = search_inode_by_path(file_path);
     if (node != NULL) {
         // release the whole inode
         inode_release(node);
     }
-    int inode_id = find_free_inode();
-    if (inode_id == -1) {
+    INode* n = find_free_inode();
+    if (n == NULL) {
         // no more free inodes
         printf("ERROR: No more free inodes.\n");
         return NULL;
     }
-    n->index = inode_id;
+    n->blocks = blocks_needed;
     n->bytes = content_len;
     n->hard_link_num = 1;
     n->type = 'f';
@@ -360,11 +376,10 @@ int myWrite(char* file_path, char* content) {
     }
     // occupy blocks - buffer 2
     block_read(buffer_2, BLOCKS_BMAP_BLOCK_ID);
-    int content_len = node->bytes;
     for (int i = 0; i < node->blocks; ++i) {
         int block_id = node->direct_links[i];
         // buffer 3
-        memcpy(buffer_3, content[i * BLOCK_SIZE], BLOCK_SIZE);
+        memcpy(buffer_3, content + i * BLOCK_SIZE, BLOCK_SIZE);
         block_write(buffer_3, block_id);
         // buffer 2
         set_bit_write(buffer_2, block_id, OCCP);
@@ -373,16 +388,7 @@ int myWrite(char* file_path, char* content) {
     return 1;
 }
 
-void inode_release(INode* node) {
-    // block bitmap
-    free_blocks(node);
-    // inode bitmap
-    free_inode(node->index);
-    // free
-    free(node);
-}
-
-void setTest() {
+void init() {
     if (access(DISK_PATH, F_OK) != 0) {
         // file doesn't exist
         create_zeroes();
@@ -390,6 +396,14 @@ void setTest() {
     // metadata set
     initFilePtr();
     initYLLFS();
+}
+
+void end() {
+    // close file
+    fclose(ptr);
+}
+
+void setTest() {
     // inode set
     inode_buff[1] = 0x34;
     inode_write(inode_buff, 11);
@@ -401,7 +415,6 @@ void setTest() {
         // printf("%x ", buffer_1[i]);
     }
     // test write inode
-
     inode_read(inode_buff, 11);
     INode* i = getINodeFromStr(inode_buff);
     i->bytes = 7219;
@@ -411,14 +424,23 @@ void setTest() {
     block_read(buffer_0, INODES_BMAP_BLOCK_ID);
     set_bit_write(buffer_0, 11, 0);
     block_write(buffer_0, INODES_BMAP_BLOCK_ID);
-    int index = search_inode_id("/yopou.txt\0");
-    printf("The inode id is : %d\n", index);
-    // close file
-    fclose(ptr);
+    INode* n = search_inode_by_path("/yopou.txt\0");
+    printf("The inode id is : %d\n", n->index);
 }
 
 int main(int argc, char const *argv[])
 {
+    
+    init();
+    myWrite("/p1.txt\0", "Hello from the world!\0");
+    myRead("/p1.txt\0", buffer_content);
+    printf("%s\n", buffer_content);
+    end();
+
+    return 0;
+}
+
+void testINode() {
     INode m;
     m.type = 'f';
     m.index = 1;
@@ -436,10 +458,6 @@ int main(int argc, char const *argv[])
         printf("%d ", (int) inode_buff[i]);
     }
     printf("\n%s\n", inode_buff + 16);
-
-    setTest();
-
-    return 0;
 }
 
 void testBitRead() {
