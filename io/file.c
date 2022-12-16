@@ -317,7 +317,7 @@ void free_blocks(INode *n) {
 int myRead(char* file_path, char* content) {
     INode* node = search_inode_by_path(file_path);
     if (node == NULL) {
-        printf("WARNING: Not found!\n");
+        printf("WARNING: File Not found!\n");
         return -1;
     }
     for (int i = 0; i < node->blocks; ++i) {
@@ -465,11 +465,13 @@ int main(int argc, char const *argv[])
     myWrite("/p2.txt\0", "Hello Worlds\0");
     fillTestChars(testChars, 'A');
     myWrite("/p3.txt\0", testChars);
+    myDelete("/p2.txt\0");
     fillTestChars(testChars, 'B');
-    myWrite("/p2.txt\0", testChars);
+    myWrite("/p4.txt\0", testChars);
     fillTestChars(testChars, 'C');
-    myWrite("/p1.txt\0", testChars);
-    myRead("/p1.txt\0", buffer_content);
+    myDelete("/p1.txt\0");
+    myWrite("/p5.txt\0", testChars);
+    myRead("/p5.txt\0", buffer_content);
     printf("%s\n", buffer_content);
     end();
 
