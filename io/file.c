@@ -332,6 +332,7 @@ void inode_release(INode* node) {
     // block bitmap
     free_blocks(node);
     // inode bitmap
+    node->hard_link_num--;
     free_inode(node->index);
     // free
     free(node);
@@ -513,6 +514,7 @@ typedef struct Entry
 } Entry;
 
 Entry* get_entries_from(unsigned char* buff, int* num) {
+    // convert the content from buff to the table of entries
     *num = 0;
     return NULL;
 }
