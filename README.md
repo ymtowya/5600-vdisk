@@ -9,8 +9,8 @@ MacBook-Pro io % ./file
 
 ### Explanation of INode structure
 
-(Link)[https://docs.google.com/spreadsheets/d/1VriuVx8Rlb6JYqPOC-h-QCJwO6gcL8rhuBsHmAAC4gI/edit?usp=sharing]
+[Link](https://docs.google.com/spreadsheets/d/1VriuVx8Rlb6JYqPOC-h-QCJwO6gcL8rhuBsHmAAC4gI/edit?usp=sharing)
 
 ### Running Example figure
 
-(Link)[https://docs.google.com/spreadsheets/d/1VriuVx8Rlb6JYqPOC-h-QCJwO6gcL8rhuBsHmAAC4gI/edit?usp=sharing]
+[Link](https://docs.google.com/spreadsheets/d/1VriuVx8Rlb6JYqPOC-h-QCJwO6gcL8rhuBsHmAAC4gI/edit?usp=sharing)
