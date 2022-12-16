@@ -461,8 +461,9 @@ int main(int argc, char const *argv[])
     char testChars[1500];
     
     init();
-    myWrite("/p1.txt\0", "BUT YOU SIAD SO!!!\n");
-    myWrite("/p2.txt\0", "Hello Worlds\0");
+    fillTestChars(testChars, 'A');
+    myWrite("/p1.txt\0", testChars);
+    myWrite("/p1.txt\0", "Hello Worlds\0");
     fillTestChars(testChars, 'A');
     myWrite("/p3.txt\0", testChars);
     myDelete("/p2.txt\0");
