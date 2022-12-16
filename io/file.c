@@ -462,7 +462,7 @@ int main(int argc, char const *argv[])
     
     init();
     myWrite("/p1.txt\0", "I don't like that!\0");
-    myWrite("/p1.txt\0", "Hello Worlds\0");
+    myWrite("/p2.txt\0", "Hello Worlds\0");
     fillTestChars(testChars, 'A');
     myWrite("/p3.txt\0", testChars);
     myDelete("/p2.txt\0");
