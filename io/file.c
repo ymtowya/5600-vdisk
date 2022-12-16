@@ -8,7 +8,7 @@
 #define FREE 0x01
 #define BLOCK_SIZE 512
 #define BLOCK_NUM 4096
-#define INODE_NUM 4096
+#define INODE_NUM 1783
 #define INODE_SIZE 32
 #define INODES_BMAP_BLOCK_ID 1
 #define BLOCKS_BMAP_BLOCK_ID 2
@@ -19,6 +19,7 @@
 #define CONTENT_MAX_LEN 512 * 9 + 1
 #define DELIM '|'
 #define DISK_PATH "./disk.bin" // "./../disk/disk.bin"
+
 
 unsigned char inode_buff[INODE_SIZE];
 unsigned char buffer_0[BLOCK_SIZE];
@@ -146,7 +147,7 @@ void initYLLFS() {
     buff_fills(buffer_0, 0x0);
     fill_int_write(buffer_0, 0, 3, 0x01); // magic number ?
     fill_int_write(buffer_0, 4, 7, 200L); // block number
-    fill_int_write(buffer_0, 8, 11, 4096L); // number of inodes
+    fill_int_write(buffer_0, 8, 11, INODE_NUM); // number of inodes
     block_write(buffer_0, 0);
     // Block 1 - inode bitmap
     buff_fills(buffer_1, 0xff);
@@ -503,5 +504,39 @@ void testBitRead() {
     printf("%d\n", get_bit_read(bu, 12));
     printf("%d\n", get_bit_read(bu, 13));
     printf("%d\n", get_bit_read(bu, 15));
+}
 
+typedef struct Entry
+{
+    char* file_name;
+    int inode_id;
+} Entry;
+
+Entry* get_entries_from(unsigned char* buff, int* num) {
+    *num = 0;
+    return NULL;
+}
+
+Entry* find_entries_of_path(char* directory_path, int *num) {
+    // find the inode of the directory
+    INode* dir_node = NULL;
+    // find the directory table
+    block_read(buffer_0, dir_node->direct_links[0]);
+    // convert to list of entries
+    Entry* entries = get_entries_from(buffer_0, num);
+    return entries;
+}
+
+INode* search_inode_in_dir(Entry* entries, int num, char* file_name) {
+    // find entries in the dir
+    // go through entries to seek the file
+    for (int i = 0; i < num; ++i) {
+        if (strcmp((entries + i)->file_name, file_name) == 0) {
+            int tmp = (entries + i)->inode_id;
+            inode_read(inode_buff, tmp);
+            INode* node = getINodeFromStr(inode_buff);
+            return node;
+        }
+    }
+    return NULL;
 }
